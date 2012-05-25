@@ -80,20 +80,20 @@ class MumbleConnection
 
   def permission_query channel_id, permissions, flush
     message = MumbleProto::PermissionQuery.new
-    message.channel_id = channel_id if channel_id != nil
-    message.permission = permissions if permissions != nil
+    message.channel_id = channel_id if channel_id
+    message.permission = permissions if permissions
     message.flush = flush if flush != nil
 
     mumble_write(message)  
   end
 
-  def send_text_message actor, session, channel_id, tree_id, message
+  def send_text_message actor, message_text, session = nil, channel_id = nil, tree_id = nil
     message = MumbleProto::TextMessage.new
     message.actor = actor
-    message.session = session
-    message.channel_id = channel_id
-    message.message = tree_id
-    message.message = message
+    message.session << session if session
+    message.channel_id << channel_id if channel_id
+    message.tree_id << tree_id if tree_id
+    message.message = message_text
 
     mumble_write(message)
   end

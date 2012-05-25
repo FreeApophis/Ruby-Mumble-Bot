@@ -23,7 +23,7 @@ options = { :debug => false }
 op = OptionParser.new do |opts|
   opts.banner = "Usage: mbot.rb SERVER[:PORT] [OPTIONS] \n\n"
   opts.on("-c CHAN", "--channel CHAN", "Switch to Channel.") do  |chan|
-    options[:chan] = chan
+    options[:channel] = chan
   end
   opts.on("-d", "--debug", "Debugging.") do
     options[:debug] = true
@@ -48,13 +48,21 @@ if (ARGV.length == 0)
 end
 
 server = ARGV[0].split(":")
-
 client = MumbleClient.new(server[0], server.length > 1 ? server[1] : 64738, options)
 client.version = "RuMuBo 0.3"
 client.username = "RuMuBo"
 client.connect
 
-#while client.ready?
+while !client.ready?
+  sleep 0.2
+end
+
+if options[:channel]
+  client.switch_channel options[:channel]
+end
+
+client.send_channel_message "PP-Ops", "Test Channel Message"
+client.send_user_message "Test", "Test User Message"
 
 trap("INT") do
   puts ""

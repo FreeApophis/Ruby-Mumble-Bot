@@ -3,7 +3,7 @@
 # ----------------------
 
 class User
-  attr_reader :name, :session_id, :channel
+  attr_reader :name, :session, :channel
 
   def initialize user_info, users, channels
     @name = user_info.name
@@ -12,6 +12,7 @@ class User
     @channel.add_localuser self
     @users = users
     @users[user_info.session] = self
+    @session = user_info.session
   end
 
   def update(user_info, channels)

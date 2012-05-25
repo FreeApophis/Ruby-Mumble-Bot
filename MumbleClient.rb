@@ -13,24 +13,20 @@ class MumbleClient < MumbleConnection
   def initialize server, port, options
     super
     @root_channel
-    @channels = {}
+    @channels = { }
     @users = { }
+    @ready = false
   end 
-
-  def find_user name
-    @users.each do |session, user |
-      if user.name == name
-        return user
-      end
-    end
-    return nil
-  end
 
   def connect
     super
 
     send_version
     send_authenticate
+  end
+  
+  def ready?
+    return @ready
   end
   
   def debug
@@ -47,42 +43,108 @@ class MumbleClient < MumbleConnection
     super @version
   end
 
-private
+  def switch_channel channel
+    channel = find_channel(channel)
 
-  def update_user(user_state)
+    send_user_state @session, channel.channel_id
   end
 
-  def update_channels(channel_state)
-  
+  def send_channel_message channel, message, recursive = false
+    channel = find_channel(channel)
+    if recursive
+      send_text_message @session, message, nil, nil, channel.channel_id
+    else
+      send_text_message @session, message, nil, channel.channel_id
+    end
+  end
+
+  def send_user_message user, message
+    send_text_message @session, message, find_user(user).session
+  end
+
+private
+
+  def find_user user
+    users = @users.values.select{ |u| (u.name == user) || (u.session == user) }
+    raise "User not found" if (users.length == 0)
+
+    return users.first
+  end
+
+  def find_channel channel
+    channels = @channels.values.select{ |chan| (chan.name == channel) || (chan.channel_id == channel) }
+    raise "Channel not found" if (channel.length == 0)
+
+    return channels.first
   end
 
   def message_handler message
     case message
       when MumbleProto::UserState
 puts message.inspect
-        user = @users.fetch(message.session) { |session| user = User.new(message, @users, @channels); }
-        user.update(message, @channels)
+        update_users(message)
         follow_apophis
       when MumbleProto::ChannelState
-        chan = @channels.fetch(message.channel_id) { |channel_id| chan = Channel.new(message, @root_channel, @channels); }
-        chan.update(message)
-        @root_channel = chan if !@root_channel
+        update_channels(message)  
       when MumbleProto::ServerSync
-        @session = message.session
-        @max_bandwidth = message.max_bandwidth
-        @welcome_text = message.welcome_text
-        @permissions = message.permissions
+        handle_server_sync(message)
         follow_apophis
+      when MumbleProto::TextMessage
+        handle_text_message (message)
       when MumbleProto::ContextActionModify
         puts message.inspect
       else
     end
   end
   
+  def update_users(message)
+    user = @users.fetch(message.session) { |session| user = User.new(message, @users, @channels); }
+    user.update(message, @channels)
+  end
+
+  def update_channels(message)  
+    chan = @channels.fetch(message.channel_id) { |channel_id| chan = Channel.new(message, @root_channel, @channels); }
+    chan.update(message)
+
+    @root_channel = chan if !@root_channel
+  end
+
+  def handle_server_sync message
+    @session = message.session
+    @max_bandwidth = message.max_bandwidth
+    @welcome_text = message.welcome_text
+    @permissions = message.permissions
+ 
+   @ready = true
+  end
+
+  def handle_text_message(message)
+    puts "Message from #{@users[message.actor].name}"
+
+    message.channel_id.each do |channel_id|
+      puts "Message to channel #{@channels[channel_id].name}"
+    end
+    message.tree_id.each do |tree_id|
+      puts "Message to channel #{@channels[tree_id].name} and all subchannels"
+    end
+    message.session.each do |session|
+      puts "Message to user #{@users[session].name}"
+      if @session = session
+        puts "Thats me"
+      else
+        puts "BAD: Thats not me"
+      end
+    end
+    puts message.inspect
+  end
+
   def follow_apophis
-    user = find_user "Apophis"
-    if user && @session
-      send_user_state @session, user.channel.channel_id
+    begin
+      user = find_user "Apophis"
+      if user && @session
+        send_user_state @session, user.channel.channel_id
+      end
+    rescue
     end
   end
 end
