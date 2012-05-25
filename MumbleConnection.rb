@@ -2,6 +2,10 @@
 # RubyMumbleBot
 # ----------------------
 
+require 'socket'
+require 'openssl'
+require 'fileutils'
+
 require File.expand_path "../MessageTypes", __FILE__
 require File.expand_path "../Tools", __FILE__
 
@@ -10,9 +14,15 @@ class MumbleConnection
     @server = server
     @port = port
     @options = options
-    load_keys
-    @connected = false
+    @username = options[:username]
+    unless File.exists?(@username)
+      FileUtils.mkdir @username
+    end
+
     @mumble_version = (1 << 16) + (2 << 8) + 3
+    @connected = false
+
+    ssl_key_setup
   end
 
   def connected?
@@ -20,6 +30,9 @@ class MumbleConnection
   end
 
   def connect
+    unless @username
+      raise "We cannot connect without a username"
+    end
 
     socket = TCPSocket.new(@server, @port)
 
@@ -27,6 +40,7 @@ class MumbleConnection
     ssl_context = OpenSSL::SSL::SSLContext.new(:TLSv1)
     ssl_context.verify_mode = OpenSSL::SSL::VERIFY_NONE
     ssl_context.key = @key
+    ssl_context.cert = @cert
 
     @ssl_socket = OpenSSL::SSL::SSLSocket.new(socket, ssl_context)
     @ssl_socket.sync_close = true
@@ -150,15 +164,41 @@ class MumbleConnection
   end
 
 protected
-  def load_keys
-    if (File.exists? 'private_key.pem')
-      @key = OpenSSL::PKey::RSA.new File.read 'private_key.pem'
+  def ssl_key_setup
+    if (File.exists? File.join(@username, 'private_key.pem'))
+      @key = OpenSSL::PKey::RSA.new File.read File.join(@username, 'private_key.pem')
     else 
       @key = OpenSSL::PKey::RSA.new 2048
-      open 'private_key.pem', 'w' do |io| io.write @key.to_pem end
-      open 'public_key.pem', 'w' do |io| io.write @key.public_key.to_pem end
+      open File.join(@username, 'private_key.pem'), 'w' do |io| io.write @key.to_pem end
+      open File.join(@username, 'public_key.pem'), 'w' do |io| io.write @key.public_key.to_pem end
+    end
+
+    if (File.exists? File.join(@username, 'cert.pem'))
+      @cert = OpenSSL::X509::Certificate.new File.read(File.join(@username, 'cert.pem'))
+    else 
+      subject = "/C=#{@options[:country_code]}/O=#{@options[:organisation]}/OU=#{@options[:organisation_unit]}/CN=#{@username}/mail=#{@options[:mail_address]}"
+
+      @cert = OpenSSL::X509::Certificate.new
+      @cert.subject = @cert.issuer = OpenSSL::X509::Name.parse(subject)
+      @cert.not_before = Time.now
+      @cert.not_after = Time.now + 365 * 24 * 60 * 60 * 5
+      @cert.public_key = @key.public_key
+      @cert.serial = 0x0
+      @cert.version = 2
+
+      ef = OpenSSL::X509::ExtensionFactory.new
+      ef.subject_certificate = @cert
+      ef.issuer_certificate = @cert
+      @cert.extensions = [ ef.create_extension("basicConstraints","CA:TRUE", true), ef.create_extension("subjectKeyIdentifier", "hash") ]
+      @cert.add_extension ef.create_extension("authorityKeyIdentifier", "keyid:always,issuer:always")
+
+      @cert.sign @key, OpenSSL::Digest::SHA1.new
+
+      open File.join(@username, 'cert.pem'), 'w' do |io| io.write @cert.to_pem end
     end
   end
+
+
 
   def mumble_write(buffer)
     message_string = buffer.serialize_to_string

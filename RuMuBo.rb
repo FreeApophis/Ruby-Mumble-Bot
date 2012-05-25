@@ -11,14 +11,21 @@ require 'rubygems'
 require 'optparse'
 require 'pp'
 require 'fileutils'
-require 'socket'
-require 'openssl'
 
 require File.expand_path "../Mumble.pb", __FILE__
 require File.expand_path "../MumbleClient", __FILE__
 
 
-options = { :debug => false }
+
+options = { 
+  :version => "RuMuBo 0.4",
+  :debug => false,
+  :username => "RuMuBo", 
+  :country_code => "CH",
+  :organisation => "Apophis.ch",
+  :organisation_unit => "Software",
+  :mail_address => "apophis@apophis.ch"
+}
 
 op = OptionParser.new do |opts|
   opts.banner = "Usage: mbot.rb SERVER[:PORT] [OPTIONS] \n\n"
@@ -31,6 +38,9 @@ op = OptionParser.new do |opts|
   opts.on("-h", "--help", "This Help") do |h|
     puts opts.help();
     exit 0;
+  end
+  opts.on("-u", "--username", "Set a username") do |username|
+    options[:username] = username
   end
 
   opts.separator("")
@@ -49,8 +59,6 @@ end
 
 server = ARGV[0].split(":")
 client = MumbleClient.new(server[0], server.length > 1 ? server[1] : 64738, options)
-client.version = "RuMuBo 0.3"
-client.username = "RuMuBo"
 client.connect
 
 while !client.ready?
@@ -61,8 +69,8 @@ if options[:channel]
   client.switch_channel options[:channel]
 end
 
-client.send_channel_message "PP-Ops", "Test Channel Message"
-client.send_user_message "Test", "Test User Message"
+#client.send_channel_message "PP-Ops", "Test Channel Message"
+#client.send_user_message "Test", "Test User Message"
 
 trap("INT") do
   puts ""

@@ -3,6 +3,7 @@
 # ----------------------
 
 require File.expand_path "../MumbleConnection", __FILE__
+require File.expand_path "../MessageHandler", __FILE__
 require File.expand_path "../Channel", __FILE__
 require File.expand_path "../User", __FILE__
 
@@ -16,6 +17,7 @@ class MumbleClient < MumbleConnection
     @channels = { }
     @users = { }
     @ready = false
+    @version = options[:version]
   end 
 
   def connect
@@ -59,21 +61,22 @@ class MumbleClient < MumbleConnection
   end
 
   def send_user_message user, message
-    send_text_message @session, message, find_user(user).session
+    user = find_user(user)
+    if user
+      send_text_message @session, message, user.session
+    end
   end
 
 private
 
   def find_user user
     users = @users.values.select{ |u| (u.name == user) || (u.session == user) }
-    raise "User not found" if (users.length == 0)
 
     return users.first
   end
 
   def find_channel channel
     channels = @channels.values.select{ |chan| (chan.name == channel) || (chan.channel_id == channel) }
-    raise "Channel not found" if (channel.length == 0)
 
     return channels.first
   end
@@ -115,6 +118,8 @@ puts message.inspect
     @welcome_text = message.welcome_text
     @permissions = message.permissions
  
+print MessageHandler.instance_methods.inspect
+
    @ready = true
   end
 
@@ -135,16 +140,24 @@ puts message.inspect
         puts "BAD: Thats not me"
       end
     end
-    puts message.inspect
+
+    text = message.message.to_s
+
+    if text.match /^!find/
+      nick = text[6..-1]
+      user = find_user nick
+      if user
+        send_user_message message.actor, "User '#{user.name}' is in Channel '#{user.channel.path}'"
+      else
+        send_user_message message.actor, "There is no user '#{nick}' on the Server"
+      end
+    end
   end
 
   def follow_apophis
-    begin
-      user = find_user "Apophis"
-      if user && @session
-        send_user_state @session, user.channel.channel_id
-      end
-    rescue
+    user = find_user "Apophis"
+    if user && @session
+      send_user_state @session, user.channel.channel_id
     end
   end
 end

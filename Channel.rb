@@ -28,6 +28,14 @@ class Channel
     @localusers.each { |user| user.print(level + 1) }
   end
 
+  def path
+    if @parent_channel
+      return @parent_channel.path() + "/" + @name
+    else
+      return @name
+    end
+  end
+
   def update channel_info
   end
 
