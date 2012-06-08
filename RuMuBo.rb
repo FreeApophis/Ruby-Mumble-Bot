@@ -15,8 +15,6 @@ require 'fileutils'
 require File.expand_path "../Mumble.pb", __FILE__
 require File.expand_path "../MumbleClient", __FILE__
 
-
-
 options = { 
   :version => "RuMuBo 0.4",
   :debug => false,
@@ -68,6 +66,8 @@ end
 if options[:channel]
   client.switch_channel options[:channel]
 end
+
+client.send_test
 
 #client.send_channel_message "PP-Ops", "Test Channel Message"
 #client.send_user_message "Test", "Test User Message"

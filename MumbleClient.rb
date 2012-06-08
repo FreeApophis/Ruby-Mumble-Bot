@@ -84,7 +84,9 @@ private
   def message_handler message
     case message
       when MumbleProto::UserState
+
 puts message.inspect
+puts "xxx #{message.deaf}"
         update_users(message)
         follow_apophis
       when MumbleProto::ChannelState
@@ -96,6 +98,8 @@ puts message.inspect
         handle_text_message (message)
       when MumbleProto::ContextActionModify
         puts message.inspect
+      when MumbleProto::UDPTunnel
+        mumble_write(message)
       else
     end
   end

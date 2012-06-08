@@ -21,7 +21,7 @@ class MumbleConnection
 
     @mumble_version = (1 << 16) + (2 << 8) + 3
     @connected = false
-
+    @sequence = -2
     ssl_key_setup
   end
 
@@ -146,6 +146,15 @@ class MumbleConnection
     mumble_write(message)
   end
 
+  def send_test
+    message = MumbleProto::UserState.new
+    message.session = session
+    message.actor = session
+    message.comment = "Je suis RuMuBo - c'est facile"
+
+    mumble_write(message)
+  end
+
   def send_user_remove session, reason, ban
     message = MumbleProto::UserRemove.new
     message.session = session
@@ -198,14 +207,32 @@ protected
     end
   end
 
-
-
   def mumble_write(buffer)
-    message_string = buffer.serialize_to_string
+    message_string = nil
+    if buffer.is_a? MumbleProto::UDPTunnel
+#      puts (Time.now - @last).to_s if @last
+#      @last = Time.now
+
+      index = 0
+      temp = [buffer.packet[index]].pack('c*')
+      tt = Tools.decode_type_target(buffer.packet[index])
+      index = 1
+      vi1 = Tools.decode_varint buffer.packet, index
+      index = vi1[:new_index]
+      session = vi1[:result]
+      vi2 = Tools.decode_varint buffer.packet, index
+      index = vi2[:new_index]
+      sequence = vi2[:result]
+      @sequence = @sequence + 2
+      data = buffer.packet[index..-1]
+      message_string = temp + Tools.encode_varint(@sequence) + data
+    else 
+      message_string = buffer.serialize_to_string
+    end
     message_type = MP_RTYPES[buffer.class]
     type_string = [message_type, message_string.size].pack('nN')
     ret = @ssl_socket.write(type_string + message_string)
-    STDERR.puts "--> message type #{buffer.class}, sent #{ret} bytes." if @options[:debug]
+#    STDERR.puts "--> message type #{buffer.class}, sent #{ret} bytes." if @options[:debug]
   end
  
   def mumble_read()
@@ -214,8 +241,8 @@ protected
  
     type, size = type_string.unpack('nN')
     if type == 1 
-        message = MumbleProto::UDPTunnel.new 
-        message.packet = @ssl_socket.read(size)
+      message = MumbleProto::UDPTunnel.new 
+      message.packet = @ssl_socket.read(size)
       STDERR.puts "<-- message type #{MP_TYPES[type]} of size #{size}." if @options[:debug]
     else
       return nil unless MP_TYPES.has_key?(type)

@@ -28,7 +28,7 @@ puts "DANGER"
   end
 
   def print(level)
-    puts ("  "  * level) + "U " + @name
+    puts ("  "  * level) + "U " + @name + " (#{@session})"
   end
 end
 
