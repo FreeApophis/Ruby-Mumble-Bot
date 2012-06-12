@@ -10,14 +10,27 @@ require File.expand_path "../User", __FILE__
 class MumbleClient < MumbleConnection
   attr_accessor :version, :username
   attr_reader :session
+  attr_reader :root_channel, :user
+  attr_reader :users, :channels
 
-  def initialize server, port, options
+  def initialize server, port, username, options
     super
     @root_channel
     @channels = { }
     @users = { }
     @ready = false
     @version = options[:version]
+    @event_handler = { }
+    
+    register_local_handlers
+  end 
+
+  def register_local_handlers
+    register_handler :UserState, method(:update_user)
+    register_handler :UserRemove, method(:remove_user)
+    register_handler :ChannelState, method(:update_channel)
+    register_handler :ServerSync, method(:handle_server_sync)
+    register_handler :TextMessage, method(:handle_text_message)
   end 
 
   def connect
@@ -34,6 +47,16 @@ class MumbleClient < MumbleConnection
   def debug
     if @options[:debug]
       @root_channel.print_tree
+    end
+  end
+
+  def log message
+    puts "[#{@username}] #{message}"
+  end
+
+  def channel
+    if @user
+      return  @user.channel
     end
   end
 
@@ -67,81 +90,82 @@ class MumbleClient < MumbleConnection
     end
   end
 
-private
+  @event_handler
 
-  def find_user user
-    users = @users.values.select{ |u| (u.name == user) || (u.session == user) }
-
-    return users.first
+  def register_handler(type, callback)
+    if !@event_handler[type]
+      @event_handler[type] = []
+    end
+    @event_handler[type] << callback
   end
 
   def find_channel channel
     channels = @channels.values.select{ |chan| (chan.name == channel) || (chan.channel_id == channel) }
-
     return channels.first
   end
 
-  def message_handler message
-    case message
-      when MumbleProto::UserState
+  def find_user user
+    users = @users.values.select{ |u| (u.name == user) || (u.session == user) }
+    return users.first
+  end
 
-puts message.inspect
-puts "xxx #{message.deaf}"
-        update_users(message)
-        follow_apophis
-      when MumbleProto::ChannelState
-        update_channels(message)  
-      when MumbleProto::ServerSync
-        handle_server_sync(message)
-        follow_apophis
-      when MumbleProto::TextMessage
-        handle_text_message (message)
-      when MumbleProto::ContextActionModify
-        puts message.inspect
-      when MumbleProto::UDPTunnel
-        mumble_write(message)
-      else
+private
+
+  def message_handler message
+    handler = @event_handler[message.class.to_s.split(":")[2].to_sym]
+    if handler
+      handler.each do |h|  
+        log "handle #{message.class} with #{h.name}" if @options[:debug]
+        h.call(self, message)
+      end
     end
   end
   
-  def update_users(message)
-    user = @users.fetch(message.session) { |session| user = User.new(message, @users, @channels); }
+  def update_user(client, message)
+    user = @users.fetch(message.session) do |session| 
+      user = User.new(message, @users, @channels)
+    end
     user.update(message, @channels)
   end
 
-  def update_channels(message)  
+  def remove_user(client, message)
+    user = @users[message.session]
+    user.remove
+  end
+
+  def update_channel(client, message)  
     chan = @channels.fetch(message.channel_id) { |channel_id| chan = Channel.new(message, @root_channel, @channels); }
     chan.update(message)
 
     @root_channel = chan if !@root_channel
   end
 
-  def handle_server_sync message
+  def handle_server_sync(client, message)
     @session = message.session
     @max_bandwidth = message.max_bandwidth
     @welcome_text = message.welcome_text
     @permissions = message.permissions
- 
-print MessageHandler.instance_methods.inspect
 
-   @ready = true
+    @user = @users[session]
+ 
+    @ready = true
   end
 
-  def handle_text_message(message)
-    puts "Message from #{@users[message.actor].name}"
+  def handle_text_message(client, message)
+    log "Message from #{@users[message.actor].name}"
 
     message.channel_id.each do |channel_id|
-      puts "Message to channel #{@channels[channel_id].name}"
+      log "Message to channel #{@channels[channel_id].name}"
     end
     message.tree_id.each do |tree_id|
-      puts "Message to channel #{@channels[tree_id].name} and all subchannels"
+      log "Message to channel #{@channels[tree_id].name} and all subchannels"
     end
     message.session.each do |session|
-      puts "Message to user #{@users[session].name}"
+      log "Message to user #{@users[session].name}"
       if @session = session
-        puts "Thats me"
+        log "Thats me"
       else
-        puts "BAD: Thats not me"
+        log "BAD: Thats not me"
       end
     end
 
@@ -155,13 +179,6 @@ print MessageHandler.instance_methods.inspect
       else
         send_user_message message.actor, "There is no user '#{nick}' on the Server"
       end
-    end
-  end
-
-  def follow_apophis
-    user = find_user "Apophis"
-    if user && @session
-      send_user_state @session, user.channel.channel_id
     end
   end
 end

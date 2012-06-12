@@ -12,8 +12,7 @@ require 'optparse'
 require 'pp'
 require 'fileutils'
 
-require File.expand_path "../Mumble.pb", __FILE__
-require File.expand_path "../MumbleClient", __FILE__
+require File.expand_path "../Client", __FILE__
 
 options = { 
   :version => "RuMuBo 0.4",
@@ -26,7 +25,7 @@ options = {
 }
 
 op = OptionParser.new do |opts|
-  opts.banner = "Usage: mbot.rb SERVER[:PORT] [OPTIONS] \n\n"
+  opts.banner = "Usage: mbot.rb SERVER[:PORT][/channel] [OPTIONS] \n\n"
   opts.on("-c CHAN", "--channel CHAN", "Switch to Channel.") do  |chan|
     options[:channel] = chan
   end
@@ -55,30 +54,19 @@ if (ARGV.length == 0)
   exit 0
 end
 
-server = ARGV[0].split(":")
-client = MumbleClient.new(server[0], server.length > 1 ? server[1] : 64738, options)
-client.connect
+servers = []
+servers << { :host => "apophis.ch", :port => 64738, :channel => "Mena Meetings", :nick => "master1" }
+servers << { :host => "apophis.ch", :port => 64738, :channel => "PP-Ops", :nick => "master2" }
 
-while !client.ready?
-  sleep 0.2
-end
-
-if options[:channel]
-  client.switch_channel options[:channel]
-end
-
-client.send_test
-
-#client.send_channel_message "PP-Ops", "Test Channel Message"
-#client.send_user_message "Test", "Test User Message"
+client = Client.new options, servers
 
 trap("INT") do
-  puts ""
-  puts "Interrupted by user, exit."
-  client.debug
-  exit
+  client.exit_by_user
+  exit 0
 end
 
-while client.connected? do
-  sleep 0.2
-end
+Thread.abort_on_exception = true
+
+client.run
+
+

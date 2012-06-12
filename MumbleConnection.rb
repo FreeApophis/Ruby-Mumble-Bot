@@ -6,15 +6,16 @@ require 'socket'
 require 'openssl'
 require 'fileutils'
 
+require File.expand_path "../Mumble.pb", __FILE__
 require File.expand_path "../MessageTypes", __FILE__
 require File.expand_path "../Tools", __FILE__
 
 class MumbleConnection
-  def initialize server, port, options
+  def initialize server, port, username, options
     @server = server
     @port = port
+    @username = username
     @options = options
-    @username = options[:username]
     unless File.exists?(@username)
       FileUtils.mkdir @username
     end
@@ -142,15 +143,6 @@ class MumbleConnection
     message.session = session
     message.actor = session
     message.channel_id = channel_id
-
-    mumble_write(message)
-  end
-
-  def send_test
-    message = MumbleProto::UserState.new
-    message.session = session
-    message.actor = session
-    message.comment = "Je suis RuMuBo - c'est facile"
 
     mumble_write(message)
   end

@@ -17,18 +17,20 @@ class User
 
   def update(user_info, channels)
     if (user_info.has_field? :channel_id) && (user_info.channel_id != @channel_id)
-puts "DANGER"
       @channel.remove_localuser self
       @channel_id = user_info.channel_id
       @channel = channels[@channel_id]
       @channel.add_localuser self
-
-      @channel.root_channel.print_tree
     end
   end
 
-  def print(level)
-    puts ("  "  * level) + "U " + @name + " (#{@session})"
+  def remove
+      @channel.remove_localuser self
+      @users.delete @session
+  end
+
+  def tree(level)
+    return ("  "  * level) + "U " + @name + " (#{@session})\n"
   end
 end
 
