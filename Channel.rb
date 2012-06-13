@@ -5,7 +5,7 @@
 class Channel
   attr_reader :name
   attr_reader :subchannels, :root_channel, :channel_id
-  attr_reader :user
+  attr_reader :localusers
   
   def initialize channel_info, root_channel, channels
     @channels = channels
@@ -50,6 +50,10 @@ class Channel
 
   def remove_localuser user
     @localusers.delete user
+  end
+
+  def inspect
+    return name
   end
 
 protected

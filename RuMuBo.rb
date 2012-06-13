@@ -48,17 +48,13 @@ end
 
 op.parse!
 
-if (ARGV.length == 0)
+if (ARGV.length < 0)
   puts "Parameter 'Server' Missing:"
   puts op.help
   exit 0
 end
 
-servers = []
-servers << { :host => "apophis.ch", :port => 64738, :channel => "Mena Meetings", :nick => "master1" }
-servers << { :host => "apophis.ch", :port => 64738, :channel => "PP-Ops", :nick => "master2" }
-
-client = Client.new options, servers
+client = Client.new options
 
 trap("INT") do
   client.exit_by_user
@@ -67,6 +63,10 @@ end
 
 Thread.abort_on_exception = true
 
-client.run
+servers = []
+servers << { :host => "apophis.ch", :port => 64738, :channel => "International Bridge" }
+servers << { :host => "talk.piratenpartei.ch", :port => 64738, :channel => "International Bridge" }
+
+client.run servers
 
 

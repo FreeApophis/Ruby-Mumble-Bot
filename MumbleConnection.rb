@@ -60,6 +60,11 @@ class MumbleConnection
     Thread.new { udp_pinger }
   end
 
+  def disconnect
+    @connected = false
+    @ssl_socket.close
+  end
+
   def send_version client_version
     message = MumbleProto::Version.new
     message.release = client_version
@@ -164,6 +169,13 @@ class MumbleConnection
     mumble_write(message)
   end
 
+  def send_udp_tunnel packet
+    message = MumbleProto::UDPTunnel.new
+    message.packet = packet
+
+    mumble_write(message)
+  end
+
 protected
   def ssl_key_setup
     if (File.exists? File.join(@username, 'private_key.pem'))
@@ -202,9 +214,6 @@ protected
   def mumble_write(buffer)
     message_string = nil
     if buffer.is_a? MumbleProto::UDPTunnel
-#      puts (Time.now - @last).to_s if @last
-#      @last = Time.now
-
       index = 0
       temp = [buffer.packet[index]].pack('c*')
       tt = Tools.decode_type_target(buffer.packet[index])
@@ -223,8 +232,11 @@ protected
     end
     message_type = MP_RTYPES[buffer.class]
     type_string = [message_type, message_string.size].pack('nN')
-    ret = @ssl_socket.write(type_string + message_string)
-#    STDERR.puts "--> message type #{buffer.class}, sent #{ret} bytes." if @options[:debug]
+    begin
+      ret = @ssl_socket.write(type_string + message_string)
+      STDERR.puts "--> message type #{buffer.class}, sent #{ret} bytes." if @options[:debug]
+    rescue IOError => e
+    end
   end
  
   def mumble_read()
@@ -251,9 +263,12 @@ protected
 
   def listen
     while @connected do
-      message = mumble_read()
-      break if message.nil?
-      message_handler(message)
+      begin
+        message = mumble_read()
+        break if message.nil?
+        message_handler(message)
+      rescue IOError => e
+      end
     end
     @connected = false
   end

@@ -29,7 +29,7 @@ class User
       @users.delete @session
   end
 
-  def tree(level)
+  def tree(level = 0)
     return ("  "  * level) + "U " + @name + " (#{@session})\n"
   end
 end

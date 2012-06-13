@@ -21,7 +21,6 @@ class MumbleClient < MumbleConnection
     @ready = false
     @version = options[:version]
     @event_handler = { }
-    
     register_local_handlers
   end 
 
@@ -107,6 +106,10 @@ class MumbleClient < MumbleConnection
   def find_user user
     users = @users.values.select{ |u| (u.name == user) || (u.session == user) }
     return users.first
+  end
+
+  def inspect
+    return "#{user.name} (#{user.session})"
   end
 
 private
