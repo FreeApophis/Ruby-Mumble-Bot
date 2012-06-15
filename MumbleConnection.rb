@@ -22,7 +22,6 @@ class MumbleConnection
 
     @mumble_version = (1 << 16) + (2 << 8) + 3
     @connected = false
-    @sequence = -2
     ssl_key_setup
   end
 
@@ -50,6 +49,7 @@ class MumbleConnection
     STDERR.print "SSLSocket connected.\n" if @options[:debug]
     STDERR.print @ssl_socket.peer_cert.to_text, "\n" if @options[:debug]
 
+
     @connected = true
 
     @udp_socket = UDPSocket.new
@@ -68,7 +68,7 @@ class MumbleConnection
   def send_version client_version
     message = MumbleProto::Version.new
     message.release = client_version
-    message.version = @mumble_version
+    message.version =  @mumble_version
     message.os = Tools.platform
     message.os_version = RUBY_PLATFORM
 
@@ -77,8 +77,9 @@ class MumbleConnection
 
   def send_authenticate username
     message = MumbleProto::Authenticate.new
-    message.username = username  
+    message.username = username
     message.celt_versions << -2147483637
+    message.celt_versions << -2147483632
 
     mumble_write(message)
   end
@@ -143,11 +144,13 @@ class MumbleConnection
     mumble_write(message)
   end
 
-  def send_user_state session, channel_id
+  def send_user_state session, channel_id, self_mute, self_deaf
     message = MumbleProto::UserState.new
     message.session = session
     message.actor = session
-    message.channel_id = channel_id
+    message.channel_id = channel_id if channel_id
+    message.self_mute = self_mute if self_mute != nil
+    message.self_deaf = self_deaf if self_deaf != nil
 
     mumble_write(message)
   end
@@ -189,23 +192,26 @@ protected
     if (File.exists? File.join(@username, 'cert.pem'))
       @cert = OpenSSL::X509::Certificate.new File.read(File.join(@username, 'cert.pem'))
     else 
-      subject = "/C=#{@options[:country_code]}/O=#{@options[:organisation]}/OU=#{@options[:organisation_unit]}/CN=#{@username}/mail=#{@options[:mail_address]}"
+      subject = "/C=#{@options[:country_code]}/O=#{@options[:organisation]}/OU=#{@options[:organisation_unit]}/CN=#{@username}"
 
       @cert = OpenSSL::X509::Certificate.new
       @cert.subject = @cert.issuer = OpenSSL::X509::Name.parse(subject)
       @cert.not_before = Time.now
       @cert.not_after = Time.now + 365 * 24 * 60 * 60 * 5
       @cert.public_key = @key.public_key
-      @cert.serial = 0x0
+      @cert.serial = rand(65535) + 1
       @cert.version = 2
 
       ef = OpenSSL::X509::ExtensionFactory.new
       ef.subject_certificate = @cert
       ef.issuer_certificate = @cert
-      @cert.extensions = [ ef.create_extension("basicConstraints","CA:TRUE", true), ef.create_extension("subjectKeyIdentifier", "hash") ]
-      @cert.add_extension ef.create_extension("authorityKeyIdentifier", "keyid:always,issuer:always")
 
-      @cert.sign @key, OpenSSL::Digest::SHA1.new
+      @cert.add_extension(ef.create_extension("basicConstraints","CA:TRUE",true))
+      @cert.add_extension(ef.create_extension("keyUsage","keyCertSign, cRLSign", true))
+      @cert.add_extension(ef.create_extension("subjectKeyIdentifier","hash",false))
+      @cert.add_extension(ef.create_extension("authorityKeyIdentifier","keyid:always",false))
+      
+      @cert.sign(@key, OpenSSL::Digest::SHA256.new)
 
       open File.join(@username, 'cert.pem'), 'w' do |io| io.write @cert.to_pem end
     end
@@ -214,24 +220,13 @@ protected
   def mumble_write(buffer)
     message_string = nil
     if buffer.is_a? MumbleProto::UDPTunnel
-      index = 0
-      temp = [buffer.packet[index]].pack('c*')
-      tt = Tools.decode_type_target(buffer.packet[index])
-      index = 1
-      vi1 = Tools.decode_varint buffer.packet, index
-      index = vi1[:new_index]
-      session = vi1[:result]
-      vi2 = Tools.decode_varint buffer.packet, index
-      index = vi2[:new_index]
-      sequence = vi2[:result]
-      @sequence = @sequence + 2
-      data = buffer.packet[index..-1]
-      message_string = temp + Tools.encode_varint(@sequence) + data
+      message_string = buffer.packet
     else 
       message_string = buffer.serialize_to_string
     end
     message_type = MP_RTYPES[buffer.class]
     type_string = [message_type, message_string.size].pack('nN')
+
     begin
       ret = @ssl_socket.write(type_string + message_string)
       STDERR.puts "--> message type #{buffer.class}, sent #{ret} bytes." if @options[:debug]
@@ -275,7 +270,7 @@ protected
 
   # default message handler, override in derived class
   def message_handler(message)
-   puts "called handler #{message.class}"
+    puts "called handler #{message.class}"
   end
 
   # without a ping the connections gets dropped after 30 secs

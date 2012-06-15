@@ -30,13 +30,26 @@ class MumbleClient < MumbleConnection
     register_handler :ChannelState, method(:update_channel)
     register_handler :ServerSync, method(:handle_server_sync)
     register_handler :TextMessage, method(:handle_text_message)
+    register_handler :CodecVersion, method(:handle_codec_version)
+    register_handler :Reject, method(:handle_reject)
+    register_handler :UserStats, method(:handle_user_stats)
   end 
 
+  @@last_connect = Time.at(0)
+  def wait
+    return Time.now - @@last_connect < 2
+  end
+
   def connect
+    while wait
+    end
+
     super
 
     send_version
     send_authenticate
+
+    @@last_connect = Time.now
   end
   
   def ready?
@@ -67,10 +80,18 @@ class MumbleClient < MumbleConnection
     super @version
   end
 
+  def mute state
+    send_user_state @session, nil, state, nil
+  end
+
+  def deaf state
+    send_user_state @session, nil, nil, state
+  end
+
   def switch_channel channel
     channel = find_channel(channel)
 
-    send_user_state @session, channel.channel_id
+    send_user_state @session, channel.channel_id, nil, nil
   end
 
   def send_channel_message channel, message, recursive = false
@@ -152,6 +173,15 @@ private
     @user = @users[session]
  
     @ready = true
+  end
+
+  def handle_codec_version(client, message)
+  end
+
+  def handle_reject(client, message)
+  end
+
+  def handle_user_stats(client, message)
   end
 
   def handle_text_message(client, message)

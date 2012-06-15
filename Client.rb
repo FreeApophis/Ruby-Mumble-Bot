@@ -63,6 +63,7 @@ class Client
       end
 
       if !@slave_by_user[client] or @slave_by_user[client][u.session]
+        update_slaves(client, u)
         next # we have already slaves for this one
       end
  
@@ -92,6 +93,24 @@ class Client
     end
   end
 
+  def update_slaves master, real_user
+    slaves = @slave_by_user[master][real_user.session]
+
+    return if !slaves.first.user # not ready yet
+
+    if real_user.self_mute != slaves.first.user.self_mute
+      slaves.each do |slave|
+        slave.mute real_user.self_mute
+      end
+    end
+
+    if real_user.self_deaf != slaves.first.user.self_deaf
+      slaves.each do |slave|
+        slave.deaf real_user.self_deaf
+      end
+    end
+  end
+
   def remove_slave slave, master
     @slave_by_host[@server_by_client[slave]].delete(slave.session)
 
@@ -113,18 +132,24 @@ class Client
 
     index = 0
     temp = [packet[index]].pack('c*')
+    zero = [0].pack('c*')
     tt = Tools.decode_type_target(packet[index])
     index = 1
+
     vi1 = Tools.decode_varint packet, index
     index = vi1[:new_index]
     session = vi1[:result]
+
     vi2 = Tools.decode_varint packet, index
     index = vi2[:new_index]
     sequence = vi2[:result]
+
     data = packet[index..-1]
     repackaged = temp + Tools.encode_varint(sequence) + data
 
     slaves = @slave_by_user[client][session]
+
+puts "#{tt[:type]}/#{tt[:target]} | #{session}::#{sequence} #{!slaves} #{data[33]}"
 
     #is from real user?
     return if !slaves
@@ -137,7 +162,7 @@ class Client
   def run servers
     servers.each do |server|
       @mastercount += 1
-      client = MumbleClient.new(server[:host], server[:port], "master#{@mastercount}", @options)
+      client = MumbleClient.new(server[:host], server[:port], server[:nick], @options)
       make_master(client)
       @masters[client] = server
       @slave_by_host[client] = {}

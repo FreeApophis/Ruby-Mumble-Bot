@@ -64,8 +64,10 @@ end
 Thread.abort_on_exception = true
 
 servers = []
-servers << { :host => "apophis.ch", :port => 64738, :channel => "International Bridge" }
-servers << { :host => "talk.piratenpartei.ch", :port => 64738, :channel => "International Bridge" }
+servers << { :host => "apophis.ch", :port => 64738, :channel => "International Bridge", :nick => "bridge-master" }
+#servers << { :host => "apophis.ch", :port => 64738, :channel => "Mena Meetings", :nick => "bridge-master2" }
+#servers << { :host => "apophis.ch", :port => 64738, :channel => "PP-Ops", :nick => "bridge-master3" }
+servers << { :host => "talk.piratenpartei.ch", :port => 64738, :channel => "International Bridge", :nick => "bridge-master" }
 
 client.run servers
 

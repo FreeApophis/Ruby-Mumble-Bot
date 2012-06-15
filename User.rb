@@ -4,6 +4,7 @@
 
 class User
   attr_reader :name, :session, :channel
+  attr_reader :self_deaf, :self_mute
 
   def initialize user_info, users, channels
     @name = user_info.name
@@ -21,6 +22,26 @@ class User
       @channel_id = user_info.channel_id
       @channel = channels[@channel_id]
       @channel.add_localuser self
+    end
+
+    if user_info.has_field? :deaf
+      @deaf = user_info.deaf
+    end
+
+    if user_info.has_field? :mute
+      @mute = user_info.mute
+    end
+
+    if user_info.has_field? :self_deaf
+      @self_deaf = user_info.self_deaf
+    end
+
+    if user_info.has_field? :self_mute
+      @self_mute = user_info.self_mute
+    end
+
+    if user_info.has_field? :suppress
+      @suppress = user_info.suppress
     end
   end
 
