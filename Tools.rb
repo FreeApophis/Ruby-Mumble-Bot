@@ -25,6 +25,12 @@ class Tools
     return  { :type => type, :target => target }
   end
 
+  def self.encode_type_target tt
+    byte = tt[:type] << 5 | tt[:target]
+
+    return [byte].pack('c*')
+  end
+
   def self.decode_varint packet, index
     p1 = packet[index]
     if (p1 & 0x80) == 0x00

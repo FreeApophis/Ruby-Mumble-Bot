@@ -131,8 +131,6 @@ class Client
     packet = message.packet
 
     index = 0
-    temp = [packet[index]].pack('c*')
-    zero = [0].pack('c*')
     tt = Tools.decode_type_target(packet[index])
     index = 1
 
@@ -145,16 +143,19 @@ class Client
     sequence = vi2[:result]
 
     data = packet[index..-1]
-    repackaged = temp + Tools.encode_varint(sequence) + data
 
     slaves = @slave_by_user[client][session]
-
-puts "#{tt[:type]}/#{tt[:target]} | #{session}::#{sequence} #{!slaves} #{data[33]}"
 
     #is from real user?
     return if !slaves
 
+    codec_type = tt[:type]
+
     slaves.each do |slave|
+      if (codec_type == 0) or (codec_type == 3)
+        tt[:type] = (client.alpha == slave.alpha) ? codec_type : 3 - codec_type
+      end
+      repackaged = Tools.encode_type_target(tt) + Tools.encode_varint(sequence) + data
       slave.send_udp_tunnel repackaged
     end
   end

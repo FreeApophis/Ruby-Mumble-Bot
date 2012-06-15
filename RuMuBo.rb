@@ -13,36 +13,23 @@ require 'pp'
 require 'fileutils'
 
 require File.expand_path "../Client", __FILE__
-
-options = { 
-  :version => "RuMuBo 0.4",
-  :debug => false,
-  :username => "RuMuBo", 
-  :country_code => "CH",
-  :organisation => "Apophis.ch",
-  :organisation_unit => "Software",
-  :mail_address => "apophis@apophis.ch"
-}
+require File.expand_path "../config", __FILE__
 
 op = OptionParser.new do |opts|
-  opts.banner = "Usage: mbot.rb SERVER[:PORT][/channel] [OPTIONS] \n\n"
-  opts.on("-c CHAN", "--channel CHAN", "Switch to Channel.") do  |chan|
-    options[:channel] = chan
-  end
+  opts.banner = "Usage: mbot.rb [OPTIONS] \n\n"
   opts.on("-d", "--debug", "Debugging.") do
-    options[:debug] = true
+    $options[:debug] = true
   end
   opts.on("-h", "--help", "This Help") do |h|
     puts opts.help();
     exit 0;
   end
-  opts.on("-u", "--username", "Set a username") do |username|
-    options[:username] = username
-  end
-
   opts.separator("")
   opts.separator("Example:")
   opts.separator("  RuMuBo.rb")
+  opts.separator("")
+  opts.separator("Configure:")
+  opts.separator("  edit your config.rb")
   opts.separator("")
 end
 
@@ -54,7 +41,7 @@ if (ARGV.length < 0)
   exit 0
 end
 
-client = Client.new options
+client = Client.new $options
 
 trap("INT") do
   client.exit_by_user
@@ -63,12 +50,7 @@ end
 
 Thread.abort_on_exception = true
 
-servers = []
-servers << { :host => "apophis.ch", :port => 64738, :channel => "International Bridge", :nick => "bridge-master" }
-#servers << { :host => "apophis.ch", :port => 64738, :channel => "Mena Meetings", :nick => "bridge-master2" }
-#servers << { :host => "apophis.ch", :port => 64738, :channel => "PP-Ops", :nick => "bridge-master3" }
-servers << { :host => "talk.piratenpartei.ch", :port => 64738, :channel => "International Bridge", :nick => "bridge-master" }
+client.run $servers
 
-client.run servers
 
 

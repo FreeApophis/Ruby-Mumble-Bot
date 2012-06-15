@@ -3,9 +3,10 @@
 # ----------------------
 
 class Channel
-  attr_reader :name
-  attr_reader :subchannels, :root_channel, :channel_id
+  attr_reader :name, :description
+  attr_reader :subchannels, :root_channel, :channel_id, :linked_channels, :parent_channel
   attr_reader :localusers
+  attr_reader :temporary, :position
   
   def initialize channel_info, root_channel, channels
     @channels = channels
@@ -42,6 +43,17 @@ class Channel
   end
 
   def update channel_info
+    if channel_info.has_field? :description
+      @description = channel_info.description
+    end
+
+    if channel_info.has_field? :temporary
+      @temporary = channel_info.temporary
+    end
+
+    if channel_info.has_field? :position
+      @position = channel_info.position
+    end
   end
 
   def add_localuser user

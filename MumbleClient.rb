@@ -12,11 +12,13 @@ class MumbleClient < MumbleConnection
   attr_reader :session
   attr_reader :root_channel, :user
   attr_reader :users, :channels
+  attr_reader :alpha, :beta
 
   def initialize server, port, username, options
     super
     @root_channel
     @channels = { }
+    @linked_channels = []
     @users = { }
     @ready = false
     @version = options[:version]
@@ -176,6 +178,10 @@ private
   end
 
   def handle_codec_version(client, message)
+    @alpha = message.alpha
+    @beta = message.beta
+    @prefer_alpha = message.prefer_alpha
+    @ops = message.opus
   end
 
   def handle_reject(client, message)

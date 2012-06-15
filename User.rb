@@ -3,8 +3,9 @@
 # ----------------------
 
 class User
-  attr_reader :name, :session, :channel
-  attr_reader :self_deaf, :self_mute
+  attr_reader :name, :session, :user_id, :comment, :channel
+  attr_reader :self_deaf, :self_mute, :deaf, :mute, :suppress
+  attr_reader :priority_speaker, :recording
 
   def initialize user_info, users, channels
     @name = user_info.name
@@ -42,6 +43,14 @@ class User
 
     if user_info.has_field? :suppress
       @suppress = user_info.suppress
+    end
+
+    if user_info.has_field? :priority_speaker
+      @priority_speaker = user_info.priority_speaker
+    end
+
+    if user_info.has_field? :recording
+      @recording = user_info.recording
     end
   end
 
