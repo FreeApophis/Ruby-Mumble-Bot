@@ -23,13 +23,17 @@ class Channel
     @name = channel_info.name
   end
 
-  def is_root
+  def root?
     return @channel_id == @parent_channel.channel_id
   end
 
+  def ordered_subchannels
+    return @subchannels.sort { |ch1, ch2| ch1.position <=> ch2.position }
+  end  
+
   def tree (level = 0)
-    result = ("  "  * level) + "C " + @name + "(#{@channel_id})\n"
-    @subchannels.each { |channel| result += channel.tree(level + 1) }
+    result = ("  "  * level) + "C " + @name + "(id:#{@channel_id},pos#{@position})\n"
+    ordered_subchannels.each { |channel| result += channel.tree(level + 1) }
     @localusers.each { |user| result += user.tree(level + 1) }
     return result
   end
@@ -54,6 +58,11 @@ class Channel
     if channel_info.has_field? :position
       @position = channel_info.position
     end
+  end
+
+  def remove
+    @parent_channel.subchannels.delete self
+    @channels.delete @channel_id
   end
 
   def add_localuser user

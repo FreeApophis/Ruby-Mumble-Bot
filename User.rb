@@ -15,6 +15,8 @@ class User
     @users = users
     @users[user_info.session] = self
     @session = user_info.session
+    @user_id = nil
+    @user_id = user_info.user_id if user_info.has_field? :user_id
   end
 
   def update(user_info, channels)
@@ -51,6 +53,10 @@ class User
 
     if user_info.has_field? :recording
       @recording = user_info.recording
+    end
+
+    if user_info.has_field? :user_id
+      @user_id = user_info.user_id
     end
   end
 

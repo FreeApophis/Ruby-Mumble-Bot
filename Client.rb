@@ -17,6 +17,7 @@ class Client
   def exit_by_user
     puts ""
     puts "user exited RuMuBo"
+    @masters.keys.first.debug
   end
 
   def connected?
@@ -28,6 +29,8 @@ class Client
     client.register_handler :UserState, method(:on_users_changed)
     client.register_handler :UserRemove, method(:on_users_changed)
     client.register_handler :UDPTunnel, method(:on_audio)
+
+    @text_handler = MessageHandler.new client
 
     client.connect
     return client

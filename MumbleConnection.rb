@@ -20,11 +20,13 @@ class MumbleConnection
       FileUtils.mkdir @username
     end
 
-    @mumble_version = (1 << 16) + (2 << 8) + 3
+    # Version 1.2.3
+    @mumble_version = (1 << 16) + (2 << 8) + 3 
     @connected = false
     ssl_key_setup
   end
 
+  # Connection State
   def connected?
     return @connected
   end
@@ -34,30 +36,35 @@ class MumbleConnection
       raise "We cannot connect without a username"
     end
 
-    socket = TCPSocket.new(@server, @port)
+    begin
+      socket = TCPSocket.new(@server, @port)
 
-    #requires TLS 1 / SSL fails
-    ssl_context = OpenSSL::SSL::SSLContext.new(:TLSv1)
-    ssl_context.verify_mode = OpenSSL::SSL::VERIFY_NONE
-    ssl_context.key = @key
-    ssl_context.cert = @cert
+      #requires TLS 1 / SSL fails
+      ssl_context = OpenSSL::SSL::SSLContext.new(:TLSv1)
+      ssl_context.verify_mode = OpenSSL::SSL::VERIFY_NONE
+      ssl_context.key = @key
+      ssl_context.cert = @cert
 
-    @ssl_socket = OpenSSL::SSL::SSLSocket.new(socket, ssl_context)
-    @ssl_socket.sync_close = true
-    @ssl_socket.connect
+      @ssl_socket = OpenSSL::SSL::SSLSocket.new(socket, ssl_context)
+      @ssl_socket.sync_close = true
+      @ssl_socket.connect
 
-    STDERR.print "SSLSocket connected.\n" if @options[:debug]
-    STDERR.print @ssl_socket.peer_cert.to_text, "\n" if @options[:debug]
+      $stderr.print "SSLSocket connected.\n" if @options[:debug]
+      $stderr.print @ssl_socket.peer_cert.to_text, "\n" if @options[:debug]
+    
+      @connected = true
 
+      @udp_socket = UDPSocket.new
+      @udp_socket.connect(@server, @port)
 
-    @connected = true
-
-    @udp_socket = UDPSocket.new
-    @udp_socket.connect(@server, @port)
-
-    Thread.new { listen }
-    Thread.new { pinger }
-    Thread.new { udp_pinger }
+      Thread.new { listen }
+      Thread.new { pinger }
+      Thread.new { udp_pinger }
+    rescue
+      puts $! 
+      puts "Connection failed. EXIT" 
+      exit
+    end
   end
 
   def disconnect
@@ -65,12 +72,20 @@ class MumbleConnection
     @ssl_socket.close
   end
 
+  # Lowlevel Send API
   def send_version client_version
     message = MumbleProto::Version.new
     message.release = client_version
     message.version =  @mumble_version
     message.os = Tools.platform
     message.os_version = RUBY_PLATFORM
+
+    mumble_write(message)
+  end
+
+  def send_udp_tunnel packet
+    message = MumbleProto::UDPTunnel.new
+    message.packet = packet
 
     mumble_write(message)
   end
@@ -84,62 +99,41 @@ class MumbleConnection
     mumble_write(message)
   end
 
-  def send_ban_list bans, query
-    message = MumbleProto::BanListNew.new
-    message.bans = bans if bans != nil
-    message.query = query
+  def send_ping 
+    message = MumbleProto::Ping.new
+    message.timestamp = Time.now.to_i
+
+    @last_ping = { :ts => message.timestamp, :ping => Time.now }
 
     mumble_write(message)
   end
 
-  def channel_remove channel_id
+  def send_reject
+    raise("server only message")
+  end
+
+  def send_server_config
+  end
+
+  def send_server_sync
+    raise("server only message")
+  end
+
+  def send_channel_remove channel_id
     message = MumbleProto::ChannelRemove.new
     message.channel_id = channel_id
 
     mumble_write(message)
   end
 
-  def permission_query channel_id, permissions, flush
-    message = MumbleProto::PermissionQuery.new
-    message.channel_id = channel_id if channel_id
-    message.permission = permissions if permissions
-    message.flush = flush if flush != nil
-
-    mumble_write(message)  
+  def send_channel_state
   end
 
-  def send_text_message actor, message_text, session = nil, channel_id = nil, tree_id = nil
-    message = MumbleProto::TextMessage.new
-    message.actor = actor
-    message.session << session if session
-    message.channel_id << channel_id if channel_id
-    message.tree_id << tree_id if tree_id
-    message.message = message_text
-
-    mumble_write(message)
-  end
-
-
-  def send_request_blob session_texture, session_comment, channel_description
-    message = MumbleProto::RequestBlob.new
-    message.session_texture = session_texture
-    message.session_comment = session_comment
-    message.channel_description = channel_description
-
-    mumble_write(message)
-  end
-
-  def send_ping timestamp = nil
-    message = MumbleProto::Ping.new
-    message.timestamp = timestamp if timestamp != nil
-
-    mumble_write(message)
-  end
-
-  def send_query_users ids, names
-    message = MumbleProto::QueryUsers.new
-    message.ids = ids
-    message.names = names
+  def send_user_remove session, reason, ban
+    message = MumbleProto::UserRemove.new
+    message.session = session
+    message.reason = reason
+    message.ban = ban
 
     mumble_write(message)
   end
@@ -155,11 +149,53 @@ class MumbleConnection
     mumble_write(message)
   end
 
-  def send_user_remove session, reason, ban
-    message = MumbleProto::UserRemove.new
-    message.session = session
-    message.reason = reason
-    message.ban = ban
+  def send_ban_list bans, query
+    message = MumbleProto::BanListNew.new
+    message.bans = bans if bans != nil
+    message.query = query
+
+    mumble_write(message)
+  end
+
+  def send_text_message actor, message_text, session = nil, channel_id = nil, tree_id = nil
+    message = MumbleProto::TextMessage.new
+    message.actor = actor
+    message.session << session if session
+    message.channel_id << channel_id if channel_id
+    message.tree_id << tree_id if tree_id
+    message.message = message_text
+
+    mumble_write(message)
+  end
+
+  def send_permission_denied
+    message = MumbleProto::PermissionDenied.new
+
+    raise("server only message")
+  end
+
+  def send_acl
+  end
+
+  def send_query_users ids, names
+    message = MumbleProto::QueryUsers.new
+    message.ids = ids
+    message.names = names
+
+    mumble_write(message)
+  end
+
+  def send_crypt_setup
+  end
+
+  def send_context_action_modify
+  end
+
+  def send_context_action
+  end
+
+  def send_user_list
+    message = MumbleProto::UserList.new
 
     mumble_write(message)
   end
@@ -172,14 +208,39 @@ class MumbleConnection
     mumble_write(message)
   end
 
-  def send_udp_tunnel packet
-    message = MumbleProto::UDPTunnel.new
-    message.packet = packet
+  def send_permission_query channel_id, permissions, flush
+    message = MumbleProto::PermissionQuery.new
+    message.channel_id = channel_id if channel_id
+    message.permission = permissions if permissions
+    message.flush = flush if flush != nil
+
+    mumble_write(message)  
+  end
+
+  def send_codec_version
+  end
+
+  def send_user_stats session
+    message = MumbleProto::UserStats.new
+    message.session = session
+
+    mumble_write(message)  
+  end
+
+  def suggest_config
+  end
+
+  def send_request_blob session_texture, session_comment, channel_description
+    message = MumbleProto::RequestBlob.new
+    message.session_texture = session_texture
+    message.session_comment = session_comment
+    message.channel_description = channel_description
 
     mumble_write(message)
   end
 
 protected
+  # SSL Setup
   def ssl_key_setup
     if (File.exists? File.join(@username, 'private_key.pem'))
       @key = OpenSSL::PKey::RSA.new File.read File.join(@username, 'private_key.pem')
@@ -217,6 +278,7 @@ protected
     end
   end
 
+  # No direct access to the socket (private)
   def mumble_write(buffer)
     message_string = nil
     if buffer.is_a? MumbleProto::UDPTunnel
@@ -229,7 +291,7 @@ protected
 
     begin
       ret = @ssl_socket.write(type_string + message_string)
-      STDERR.puts "--> message type #{buffer.class}, sent #{ret} bytes." if @options[:debug]
+      $stderr.puts "--> message type #{buffer.class}, sent #{ret} bytes." if @options[:debug]
     rescue IOError => e
     end
   end
@@ -242,20 +304,21 @@ protected
     if type == 1 
       message = MumbleProto::UDPTunnel.new 
       message.packet = @ssl_socket.read(size)
-      STDERR.puts "<-- message type #{MP_TYPES[type]} of size #{size}." if @options[:debug]
+      $stderr.puts "<-- message type #{MP_TYPES[type]} of size #{size}." if @options[:debug]
     else
       return nil unless MP_TYPES.has_key?(type)
 
-      STDERR.puts "<-- message type #{MP_TYPES[type]} of size #{size}." if @options[:debug]
+      $stderr.puts "<-- message type #{MP_TYPES[type]} of size #{size}." if @options[:debug]
       message_string = @ssl_socket.read(size)
  
       return nil if message_string.nil?
       message = MP_TYPES[type].new.parse_from_string(message_string)
     end
-    #STDERR.puts message.inspect if @options[:debug]
+    #$stderr.puts message.inspect if @options[:debug]
     return message
   end
 
+  # Main Protocol Thread
   def listen
     while @connected do
       begin
