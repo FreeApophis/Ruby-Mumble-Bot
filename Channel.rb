@@ -8,19 +8,19 @@ class Channel
   attr_reader :localusers
   attr_reader :temporary, :position
   
-  def initialize channel_info, root_channel, channels
-    @channels = channels
-    @channel_id = channel_info.channel_id
-    @root_channel = root_channel
+  def initialize client, message
+    @channels = client.channels
+    @channel_id = message.channel_id
+    @root_channel = client.root_channel
     @subchannels = []
     @localusers = []
 
-    @channels[channel_info.channel_id] = self
-    if channel_info.has_field? :parent
-      @parent_channel = @channels[channel_info.parent]
+    @channels[message.channel_id] = self
+    if message.has_field? :parent
+      @parent_channel = @channels[message.parent]
       @parent_channel.add_subchannel self
     end
-    @name = channel_info.name
+    @name = message.name
   end
 
   def root?
@@ -46,17 +46,23 @@ class Channel
     end
   end
 
-  def update channel_info
-    if channel_info.has_field? :description
-      @description = channel_info.description
+  def update client, message
+    if message.has_field? :temporary
+      @temporary = message.temporary
     end
 
-    if channel_info.has_field? :temporary
-      @temporary = channel_info.temporary
+    if message.has_field? :position
+      @position = message.position
     end
 
-    if channel_info.has_field? :position
-      @position = channel_info.position
+
+    if message.has_field? :description
+      @description = message.description
+    end
+
+    if (message.has_field? :description_hash) and  (@description_hash != message.description_hash)
+      @description_hash = message.description_hash
+      client.send_request_blob nil, nil, @channel_id
     end
   end
 

@@ -103,13 +103,13 @@ class Client
 
     if real_user.self_mute != slaves.first.user.self_mute
       slaves.each do |slave|
-        slave.mute real_user.self_mute
+        slave.self_mute real_user.self_mute
       end
     end
 
     if real_user.self_deaf != slaves.first.user.self_deaf
       slaves.each do |slave|
-        slave.deaf real_user.self_deaf
+        slave.self_deaf real_user.self_deaf
       end
     end
   end

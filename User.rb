@@ -7,56 +7,78 @@ class User
   attr_reader :self_deaf, :self_mute, :deaf, :mute, :suppress
   attr_reader :priority_speaker, :recording
 
-  def initialize user_info, users, channels
-    @name = user_info.name
-    @channel_id = user_info.channel_id
-    @channel = channels[@channel_id]
+  def initialize client, message
+    @name = message.name
+    @channel_id = message.channel_id
+    @channel = client.channels[@channel_id]
     @channel.add_localuser self
-    @users = users
-    @users[user_info.session] = self
-    @session = user_info.session
+    @users = client.users
+    @users[message.session] = self
+    @session = message.session
     @user_id = nil
-    @user_id = user_info.user_id if user_info.has_field? :user_id
+    @user_id = message.user_id if message.has_field? :user_id
   end
 
-  def update(user_info, channels)
-    if (user_info.has_field? :channel_id) && (user_info.channel_id != @channel_id)
+  def update(client, message)
+    if (message.has_field? :channel_id) && (message.channel_id != @channel_id)
       @channel.remove_localuser self
-      @channel_id = user_info.channel_id
-      @channel = channels[@channel_id]
+      @channel_id = message.channel_id
+      @channel = client.channels[@channel_id]
       @channel.add_localuser self
     end
 
-    if user_info.has_field? :deaf
-      @deaf = user_info.deaf
+    if message.has_field? :mute
+      @mute = message.mute
     end
 
-    if user_info.has_field? :mute
-      @mute = user_info.mute
+    if message.has_field? :deaf
+      @deaf = message.deaf
     end
 
-    if user_info.has_field? :self_deaf
-      @self_deaf = user_info.self_deaf
+    if message.has_field? :suppress
+      @suppress = message.suppress
     end
 
-    if user_info.has_field? :self_mute
-      @self_mute = user_info.self_mute
+    if message.has_field? :self_mute
+      @self_mute = message.self_mute
     end
 
-    if user_info.has_field? :suppress
-      @suppress = user_info.suppress
+    if message.has_field? :self_deaf
+      @self_deaf = message.self_deaf
     end
 
-    if user_info.has_field? :priority_speaker
-      @priority_speaker = user_info.priority_speaker
+    if message.has_field? :texture
+      @texture = message.texture
     end
 
-    if user_info.has_field? :recording
-      @recording = user_info.recording
+    if (message.has_field? :texture_hash) and  (@texture_hash != message.texture_hash)
+      @texture_hash = message.texture_hash
+      client.send_request_blob @session, nil, nil
     end
 
-    if user_info.has_field? :user_id
-      @user_id = user_info.user_id
+    if message.has_field? :comment
+      @comment = message.comment
+    end
+
+    if (message.has_field? :comment_hash) and (@comment_hash != message.comment_hash)
+      @comment_hash = message.comment_hash
+      client.send_request_blob nil, @session, nil
+    end
+
+    if message.has_field? :hash
+      @certificate_hash = message.hash
+    end
+
+    if message.has_field? :priority_speaker
+      @priority_speaker = message.priority_speaker
+    end
+
+    if message.has_field? :recording
+      @recording = message.recording
+    end
+
+    if message.has_field? :user_id
+      @user_id = message.user_id
     end
   end
 

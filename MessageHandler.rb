@@ -2,6 +2,7 @@ class MessageHandler
   def initialize client
     client.register_text_handler "!find", method(:on_find)
     client.register_text_handler "!goto", method(:on_goto)
+    client.register_text_handler "!test", method(:test)
   end
 
 private
@@ -21,8 +22,14 @@ private
     text = message.message
 
     nick = text[6..-1]
-    user = client.find_user nick
+    target = client.find_user nick
+    source = client.find_user message.actor
+    client.move_user source, target.channel
+  end
 
-    client.move_user
+  def test client, message
+    client.channels.each do |id, ch|
+      client.send_acl id
+    end
   end
 end

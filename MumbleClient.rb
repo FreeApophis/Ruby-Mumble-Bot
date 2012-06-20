@@ -32,7 +32,7 @@ class MumbleClient < MumbleConnection
 
   def register_local_handlers
     register_handler :Version, method(:handle_version)
-    register_handler :UDPTunnel, method(:unhandled)
+    #register_handler :UDPTunnel, method(:unhandled)
     register_handler :Authenticate, method(:unhandled)
     register_handler :Ping, method(:handle_ping)
     register_handler :Reject, method(:handle_reject)
@@ -97,6 +97,8 @@ class MumbleClient < MumbleConnection
   def debug
     if @options[:debug]
       log @root_channel.tree
+      log "#{@channels.length} Channels"
+      log "#{@users.length} Users"
     end
   end
 
@@ -136,22 +138,23 @@ class MumbleClient < MumbleConnection
     super @version
   end
 
-  def mute state
-    send_user_state @session, nil, state, nil
+  def self_mute state
+    send_user_state @session, nil, state, nil, nil, nil
   end
 
-  def deaf state
-    send_user_state @session, nil, nil, state
+  def self_deaf state
+    send_user_state @session, nil, nil, state, nil, nil
   end
 
   def switch_channel channel
     channel = find_channel(channel)
 
-    send_user_state @session, channel.channel_id, nil, nil
+    send_user_state @session, channel.channel_id, nil, nil, nil, nil
   end
 
   # Highlevel Commands on Others (usually disallowed by server)
   def move_user user, channel
+    send_user_state user.session, channel.channel_id, nil, nil, nil, nil
   end
 
   def send_channel_message channel, message, recursive = false
@@ -161,6 +164,14 @@ class MumbleClient < MumbleConnection
     else
       send_text_message @session, message, nil, channel.channel_id
     end
+  end
+
+  def mute state
+    send_user_state @session, nil, nil, nil, state, nil
+  end
+
+  def deaf state
+    send_user_state @session, nil, nil, nil, nil, state
   end
 
   def send_user_message user, message
@@ -236,9 +247,9 @@ private
 
   def update_user(client, message)
     user = @users.fetch(message.session) do |session| 
-      user = User.new(message, @users, @channels)
+      user = User.new(client, message)
     end
-    user.update(message, @channels)
+    user.update(client, message)
   end
 
   def remove_user(client, message)
@@ -247,8 +258,8 @@ private
   end
 
   def update_channel(client, message)  
-    channel = @channels.fetch(message.channel_id) { |channel_id| channel = Channel.new(message, @root_channel, @channels); }
-    channel.update(message)
+    channel = @channels.fetch(message.channel_id) { |channel_id| channel = Channel.new(client, message); }
+    channel.update(client, message)
 
     @root_channel = channel if !@root_channel
   end

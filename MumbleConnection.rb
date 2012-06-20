@@ -138,13 +138,15 @@ class MumbleConnection
     mumble_write(message)
   end
 
-  def send_user_state session, channel_id, self_mute, self_deaf
+  def send_user_state session, channel_id, self_mute, self_deaf, mute, deaf
     message = MumbleProto::UserState.new
     message.session = session
-    message.actor = session
+    #message.actor = session
     message.channel_id = channel_id if channel_id
     message.self_mute = self_mute if self_mute != nil
     message.self_deaf = self_deaf if self_deaf != nil
+    message.mute = mute if mute != nil
+    message.deaf = deaf if deaf != nil
 
     mumble_write(message)
   end
@@ -174,7 +176,12 @@ class MumbleConnection
     raise("server only message")
   end
 
-  def send_acl
+  def send_acl channel_id
+    message = MumbleProto::ACL.new
+    message.channel_id = channel_id
+    message.query = true
+
+    mumble_write(message)
   end
 
   def send_query_users ids, names
@@ -232,9 +239,9 @@ class MumbleConnection
 
   def send_request_blob session_texture, session_comment, channel_description
     message = MumbleProto::RequestBlob.new
-    message.session_texture = session_texture
-    message.session_comment = session_comment
-    message.channel_description = channel_description
+    message.session_texture << session_texture if session_texture != nil
+    message.session_comment << session_comment if session_comment != nil
+    message.channel_description << channel_description if channel_description != nil
 
     mumble_write(message)
   end
