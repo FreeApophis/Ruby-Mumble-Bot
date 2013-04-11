@@ -4,7 +4,7 @@
 # 
 # option optimize_for = SPEED;
 # 
-# message Version {
+# message	Version {
 # 	optional uint32 version = 1;
 # 	optional string release = 2;
 # 	optional string os = 3;
@@ -147,6 +147,7 @@
 # 		MissingCertificate = 7;
 # 		UserName = 8;
 # 		ChannelFull = 9;
+# 		NestingLimit = 10;
 # 	}
 # 	optional uint32 permission = 1;
 # 	optional uint32 channel_id = 2;
@@ -445,6 +446,7 @@ module MumbleProto
       MissingCertificate = value(:MissingCertificate, 7)
       UserName = value(:UserName, 8)
       ChannelFull = value(:ChannelFull, 9)
+      NestingLimit = value(:NestingLimit, 10)
     end
     optional :uint32, :permission, 1
     optional :uint32, :channel_id, 2
