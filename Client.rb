@@ -131,7 +131,7 @@ class Client
   end
 
   def on_audio client, message
-    packet = message.packet
+    packet = message.packet.bytes.to_a
 
     index = 0
     tt = Tools.decode_type_target(packet[index])
