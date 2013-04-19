@@ -17,7 +17,9 @@ class Client
   def exit_by_user
     puts ""
     puts "user exited RuMuBo"
-    @masters.keys.first.debug
+    if @masters.keys.first
+      @masters.keys.first.debug
+    end
   end
 
   def connected?
