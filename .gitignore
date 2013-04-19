@@ -12,6 +12,9 @@ test/tmp
 test/version_tmp
 tmp
 
+# Config file
+config.rb
+
 # YARD artifacts
 .yardoc
 _yardoc
